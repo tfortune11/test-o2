@@ -1,0 +1,97 @@
+version: "3.8"
+
+services:
+
+  database: 
+    mem_limit: 2048m
+    image: mariadb:latest
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    env_file: .env
+    environment: 
+      MYSQL_ROOT_PASSWORD: '${MYSQL_ROOT_PASSWORD}'
+      MYSQL_DATABASE: '${MYSQL_DATABASE}'
+      MYSQL_USER: '${MYSQL_USER}'
+      MYSQL_PASSWORD: '${MYSQL_PASSWORD}'
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - wordpress-network
+
+  phpmyadmin:
+    depends_on: 
+      - database
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    ports: 
+      - 8081:80
+    env_file: .env
+    environment: 
+      PMA_HOST: database
+      MYSQL_ROOT_PASSWORD: '${MYSQL_ROOT_PASSWORD}'
+    networks:
+      - wordpress-network
+
+  wordpress: 
+    depends_on:
+      - database
+    image: wordpress:6.3.1-apache
+    restart: unless-stopped
+    ports: 
+      - 8080:80
+    env_file: .env
+    environment:
+      WORDPRESS_DB_HOST: database:3306
+      WORDPRESS_DN_NAME: '${MYSQL_DATABASE}'
+      WORDPRESS_DB_USER: '${MYSQL_USER}'
+      WORDPRESS_DB_PASSWORD: '${MYSQL_PASSWORD}'
+    volumes:
+      - ./wordpress/:/var/www/html/
+    networks:
+      - wordpress-network
+  wordmove:
+        tty: true
+        depends_on:
+            - wordpress
+        image: mfuezesi/wordmove
+        restart: on-failure:5
+        container_name: my_wordmove  # (+)
+        volumes:
+            - ./config:/home
+            - ./public:/var/www/html
+            - ~/.ssh:/root/.ssh      # (!)
+volumes:
+  db-data:
+
+networks:
+  wordpress-network:
+    driver: bridge
+
+
+
+#######################################
+#
+# In case you want to reuse this config 
+# for another Wordpress project and 
+# them have both run *simultaneously*
+# you'll need to:
+#
+# - change wordmove's container_name
+#   to anything else - marked as (+)
+#   e.g. wordmove123
+#
+# - change the first number of ports
+#   to another one   - marked as (*)
+#   "<new_host_port>:<container_port>"
+#   e.g.
+#    - change wordpres port numbers 
+#      from "8000:80" to "8001:80"
+#    - change phmyadmin port numbers 
+#      from "8080:80" to "8081:80
+#    - change database port numbers 
+#      form "3307:3306" to "3308:3306" 
+#
+# (!) Copy your local .ssh keys only if 
+#     necessary to connect to remote
+#######################################
